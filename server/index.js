@@ -83,6 +83,56 @@ const PLATFORM_MAX_DURATION = {
   tiktok: 60, reels: 60, youtube_shorts: 60, youtube: 600, facebook: 120, twitter: 120
 };
 
+async function generateCaptionWithOpenAI(videoPath, language = 'en') {
+  if (!appConfig.aiSettings.openaiEnabled || !appConfig.aiSettings.openaiKey) {
+    return null;
+  }
+
+  try {
+    const { duration } = await getVideoDuration(videoPath);
+    const openai = require('openai');
+    const client = new openai({ apiKey: appConfig.aiSettings.openaiKey });
+
+    const prompt = `Generate a short, engaging caption for a ${Math.round(duration)} second video clip suitable for social media. Language: ${language}. Keep it under 100 characters with relevant hashtags.`;
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 100
+    });
+
+    return completion.choices[0]?.message?.content || null;
+  } catch (error) {
+    console.error('OpenAI caption error:', error.message);
+    return null;
+  }
+}
+
+async function generateThumbnailWithAI(imageUrl, apiKey) {
+  if (!apiKey) return null;
+  
+  try {
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        prompt: 'Generate an attractive thumbnail for a video clip, high quality, social media style',
+        n: 1,
+        size: '400x600'
+      })
+    });
+
+    const data = await response.json();
+    return data.data?.[0]?.url || null;
+  } catch (error) {
+    console.error('AI thumbnail error:', error.message);
+    return null;
+  }
+}
+
 function getVideoDuration(inputPath) {
   return new Promise((resolve, reject) => {
     const ffmpeg = require('fluent-ffmpeg');
